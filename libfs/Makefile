@@ -7,8 +7,8 @@
 
 #CC=clang-3.8
 #CC=gcc
-CXX=g++ --std=c++11
-CC=gcc --std=gnu99
+CXX=g++-5
+CC=gcc-5
 
 ########
 #  List of all modules' directories
@@ -70,8 +70,8 @@ MLFS_FLAGS += -DSIMULATE_FRAGMENTATION
 
 #DEBUG = -O0 -gdwarf-2 -g3 -rdynamic
 #DEBUG = -g -Ofast
-DEBUG = -g -O3
-#DEBUG = -g -O0
+#DEBUG = -g -O3
+DEBUG = -g -O0
 
 ########
 #  vpath and compile function for each file

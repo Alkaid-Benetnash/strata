@@ -31,6 +31,7 @@ void mlfs_setup(void);
 #define g_segsize_bytes    (1ULL << 30)  // 1 GB
 #define g_max_read_cache_blocks  (2 << 18) // 2 GB
 //#define g_max_read_cache_blocks  (1 << 10) // 4 MB
+//#define g_max_read_cache_blocks  (1 << 15) // 128 MB
 
 #define g_fd_start  1000000
 

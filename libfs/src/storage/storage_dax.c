@@ -30,12 +30,12 @@ uint64_t storage_tsc;
 uint64_t storage_nr;
 #endif
 // iangneal: because we're using real NVM!
-//#define ENABLE_PERF_MODEL
-//#define ENABLE_BANDWIDTH_MODEL
+#define ENABLE_PERF_MODEL
+#define ENABLE_BANDWIDTH_MODEL
 
 // performance parameters
 /* SCM read extra latency than DRAM */
-uint32_t SCM_EXTRA_READ_LATENCY_NS = 150;
+uint32_t SCM_EXTRA_READ_LATENCY_NS = 1000;
 // We assume WBARRIER LATENCY is 0 since write back queue can hide this even in
 // power failure.
 // https://software.intel.com/en-us/blogs/2016/09/12/deprecate-pcommit-instruction

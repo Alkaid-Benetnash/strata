@@ -1,5 +1,5 @@
-CC=gcc
-CXX=g++ -std=c++11
+CC=gcc-5
+CXX=g++-5 -std=c++11
 
 #CC = clang-3.8
 #CXX = clang++-3.8
@@ -24,9 +24,9 @@ LD_FLAGS = -lpthread -lm -L$(NVML_DIR)/nondebug/ -lpmem -lrt \
 LD_FLAGS_CXX = -lpthread -lm -L$(NVML_DIR)/nondebug/ -lpmem -lrt \
 	-Wl,-rpath=$(abspath $(GLIB_DIR)/glib/.libs) -L$(abspath $(GLIB_DIR)/glib/.libs) #-lglib-2.0
 
-#DEBUG = -g -O0
+DEBUG = -g -O0
 #DEBUG = -g -Ofast
-DEBUG = -g -O3
+#DEBUG = -g -O3
 
 #MLFS_FLAGS = -DUSE_SLAB -DMLFS_INFO -DKERNFS
 MLFS_FLAGS = -DMLFS_INFO -DKERNFS
@@ -68,9 +68,9 @@ scrub: clean
 	@rm -rfv *.txt *.out *.log
 
 time_stat.o: time_stat.c
-	$(CC) time_stat.c -c -o time_stat.o -D_BSD_SOURCE
+	$(CC) time_stat.c -c -o time_stat.o #-D_BSD_SOURCE
 
-nvram_versus_dram: nvram_versus_dram.c time_stat.o
+nvram_versus_dram: nvram_versus_dram.c time_stat.c
 	gcc $^ -o $@ -lm
 
 test_gen.o: test_gen.cc
@@ -82,7 +82,7 @@ kernfs: kernfs.c
 extent_test: extent_test.cc time_stat.o test_gen.o
 	$(CXX) $^ $(DEBUG) -o $@ $(INCLUDES) -L../hbuild -lkernfs -L$(LIBSPDK_DIR) -lspdk $(LD_FLAGS_CXX) -Wl,-rpath=$(abspath ../build) -Wl,-rpath=$(abspath $(LIBSPDK_DIR)) -Wl,-rpath=$(abspath $(NVML_DIR)/nondebug) $(MLFS_FLAGS)
 
-concurrency_test: concurrency_test.cc time_stat.o test_gen.o
+concurrency_test: concurrency_test.cc time_stat.c test_gen.o
 	$(CXX) $^ $(DEBUG) -o $@ $(INCLUDES) -L../build -lkernfs -L$(LIBSPDK_DIR) -lspdk $(LD_FLAGS_CXX) -Wl,-rpath=$(abspath ../build) -Wl,-rpath=$(abspath $(LIBSPDK_DIR)) -Wl,-rpath=$(abspath $(NVML_DIR)/nondebug) $(MLFS_FLAGS)
 
 fifo_cli: fifo_cli.c

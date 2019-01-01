@@ -114,7 +114,7 @@ if not do_install:
     else:
         cflags = '-O2 -U_FORTIFY_SOURCE -fno-stack-protector'
 
-    extra_defs = ''
+    extra_defs = 'CC=gcc-5'
     disabled_features = { 'nscd' }
     extra_flags = '--with-tls --enable-add-ons=nptl --without-selinux --disable-test {0}'.format(' '.join(['--disable-' + f for f in disabled_features]))
 

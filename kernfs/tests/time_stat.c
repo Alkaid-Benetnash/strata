@@ -11,12 +11,12 @@ void time_stats_init(struct time_stats* ts, int n)
    ts->count = 0;
 }
 
-inline void time_stats_start(struct time_stats* ts)
+void time_stats_start(struct time_stats* ts)
 {
    gettimeofday(&ts->time_start, NULL);
 }
 
-inline void time_stats_stop(struct time_stats* ts)
+void time_stats_stop(struct time_stats* ts)
 {
    struct timeval end;
    gettimeofday(&end, NULL);

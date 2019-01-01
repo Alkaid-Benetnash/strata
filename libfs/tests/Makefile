@@ -1,4 +1,3 @@
-CC = gcc -std=c99
 #CC = c99
 EXE = iotest file_basic small_io falloc_test ftrunc_test lock_test lock_perf \
 	  simple_spdk_test dir_test many_files_test fork_io readdir_test \
@@ -42,6 +41,9 @@ LDFLAGS = -Wl,-rpath=$(abspath $(GLIBC_DIR)) \
 		  -Wl,-rpath=/lib/x86_64-linux-gnu/ \
 		  -Wl,-dynamic-linker=$(abspath $(GLIBC_DIR))/ld-linux-x86-64.so.2 \
 		  -lpthread -lrt -lm
+#-lssl -lcrypto -lrdmacm -libverbs
+CC=gcc-5 -std=c99
+CXX=g++-5
 
 all: $(EXE)
 
@@ -82,8 +84,8 @@ write_read: write_read.c time_stat.o
 	$(CC) -g -o $(addsuffix .normal, $@) $^ $(LIBSPDK) $(CFLAGS) $(DAX_OBJ) -L$(NVML_DIR) -lpmem -lpthread -lm -lrt  -Wl,-rpath=$(abspath $(NVML_DIR))
 
 iotest: iotest.cc time_stat.o thread.cc
-	$(CXX) -std=c++11 -g -Ofast -o $@ $^  -I$(INCLUDES) -L$(LIBFS_DIR) -lmlfs -L$(LIBSPDK_DIR) -lspdk -DMLFS $(CFLAGS) $(LDFLAGS)
-	$(CXX) -std=c++11 -g -Ofast -o $(addsuffix .normal, $@) $^ $(LIBSPDK) $(CFLAGS) $(DAX_OBJ) -L$(NVML_DIR) -lpmem -lpthread -lm -lrt -Wl,-rpath=$(abspath $(NVML_DIR))
+	$(CXX) -std=c++11 -g -o $@ $^  -I$(INCLUDES) -L$(LIBFS_DIR) -lmlfs -L$(LIBSPDK_DIR) -lspdk -DMLFS $(CFLAGS) $(LDFLAGS) 
+	$(CXX) -std=c++11 -g -o $(addsuffix .normal, $@) $^ $(LIBSPDK) $(CFLAGS) $(DAX_OBJ) -L$(NVML_DIR) -lpmem -lpthread -lm -lrt -Wl,-rpath=$(abspath $(NVML_DIR))
 
 fwrite_fread: fwrite_fread.cc time_stat.o thread.cc
 	$(CXX) -std=c++11 -g -Ofast -o $@ $^  -I$(INCLUDES) -L$(LIBFS_DIR) -lmlfs -L$(LIBSPDK_DIR) -lspdk -DMLFS $(CFLAGS) $(LDFLAGS)

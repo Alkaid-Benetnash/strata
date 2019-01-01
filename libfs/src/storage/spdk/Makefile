@@ -14,8 +14,8 @@ MLFS_DEP_OBJS = $(MLFS_DIR)/../$(PREFIX)/global/util.o
 OBJS += $(MLFS_DEP_OBJS)
 
 CFLAGS += $(MLFS_FLAGS) -I. -I $(MLFS_DIR) $(ENV_CFLAGS) -I $(SPDK_ROOT_DIR)/include
-#DEBUG := -O0 -g
-DEBUG := -O3
+DEBUG := -O0 -g
+#DEBUG := -O3
 
 SPDK_LIBS += $(SPDK_ROOT_DIR)/build/lib/libspdk_nvme.a \
 			 $(SPDK_ROOT_DIR)/build/lib/libspdk_util.a \
@@ -27,12 +27,12 @@ LIBS += $(SPDK_LIBS) $(ENV_LINKER_ARGS)
 all: libspdk.so
 
 verify:
-	gcc -o verify verify.c $(MLFS_FLAGS) -L. -lspdk
+	$(CC) -o verify verify.c -L. -lspdk 
 
 libspdk.so: $(OBJS) $(ENV_LIBS)
 	@echo "build shared library"
-	gcc -shared -fPIC $(DEBUG) -o libspdk.so -Wl,--whole-archive $(SPDK_LIBS) \
-	-Wl,--no-whole-archive $(MLFS_FLAGS) $^ -ldl -lrt -lm
+	$(CC) -shared -fPIC $(DEBUG) -o libspdk.so -Wl,--whole-archive $(SPDK_LIBS) \
+	-Wl,--no-whole-archive $^ -ldl -lrt -lm
 
 clean :
 	$(CLEAN_C)
