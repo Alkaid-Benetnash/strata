@@ -1186,7 +1186,7 @@ int do_unaligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_
     else if (_fcache_block->log_addr) {
       addr_t block_no = _fcache_block->log_addr;
       uint16_t fc_off = _fcache_block->start_offset;
-      mlfs_debug("GET from cache: blockno %lu (%lu, %lu, (%d,%d)) offset %lu(0x%lx) dst %lx size %lu\n",
+      mlfs_info("GET from cache: blockno %lu (%lu, %lu, (%d,%d)) offset %lu(0x%lx) dst %lx size %lu\n",
               block_no, g_fs_log->start_blk, g_fs_log->next_avail, _fcache_block->log_version, g_fs_log->avail_version, off, off, dst, io_size);
 
       if (off - off_aligned < fc_off) { // incomplete fcache
@@ -1272,6 +1272,7 @@ int do_unaligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_
       g_perf_stats.read_data_nr++;
       g_perf_stats.read_data_size += bh->b_size;
     }
+    mlfs_info("get from NVM, dst %lx, blkno %lu, offset %lu, size %u\n", dst, bmap_req.block_no, off - off_aligned,io_size);
   }
   // SSD and HDD cache: do read caching.
   else {
@@ -1322,6 +1323,7 @@ int do_aligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_si
   uint32_t bitmap_size = (io_size >> g_block_size_shift), bitmap_pos;
   struct cache_copy_list copy_list[bitmap_size];
   bmap_req_t bmap_req;
+  mlfs_info("aligned read %lu(0x%lx) size %u\n", off, off, io_size);
 
   DECLARE_BITMAP(io_bitmap, bitmap_size);
 
@@ -1333,7 +1335,6 @@ int do_aligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_si
   INIT_LIST_HEAD(&io_list_log);
 
   mlfs_assert(io_size % g_block_size_bytes == 0);
-
   for (pos = 0, _off = off; pos < io_size;
       pos += g_block_size_bytes, _off += g_block_size_bytes) {
     key = (_off >> g_block_size_shift);
@@ -1370,7 +1371,7 @@ int do_aligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_si
         bitmap_clear(io_bitmap, (pos >> g_block_size_shift), 1);
         io_to_be_done++;
 
-        mlfs_debug("read cache hit: offset %lu(0x%lx) size %u\n",
+        mlfs_info("read cache hit: offset %lu(0x%lx) size %u\n",
               off, off, io_size);
       }
       // the update log search
@@ -1378,8 +1379,8 @@ int do_aligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_si
         addr_t block_no = _fcache_block->log_addr;
         uint16_t fc_off = _fcache_block->start_offset;
 
-        mlfs_debug("GET from cache: blockno %lu (%lu, %lu, (%d,%d)) offset %lu(0x%lx) dst %lx size %lu\n",
-              block_no, g_fs_log->start_blk, g_fs_log->next_avail, _fcache_block->log_version, g_fs_log->avail_version, _off, _off, dst, io_size);
+        mlfs_debug("GET from update log: blockno %lx offset %lu(0x%lx) size %lu\n",
+            block_no, off, off, io_size);
 
         bh = bh_get_sync_IO(g_fs_log->dev, block_no, BH_NO_DATA_ALLOC);
 
@@ -1471,7 +1472,7 @@ do_global_search:
   if (ret == -EIO) {
     if (bmap_req.blk_count_found != bmap_req.blk_count) {
       //panic("could not found blocks in any storage layers\n");
-      mlfs_debug("inum %u - count not find block in any storage layer\n",
+      mlfs_info("inum %u - count not find block in any storage layer\n",
           ip->inum);
     }
     goto do_io_aligned;

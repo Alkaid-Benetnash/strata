@@ -25,8 +25,8 @@ LDFLAGS =  -Wl,-rpath=$(abspath $(LIBFS_BUILD_DIR)) \
 		   -Wl,-rpath=$(abspath $(NVML_DIR)) \
 		   -lm
 
-#DEBUG = -g -O0
-DEBUG = -O3 -g
+DEBUG = -g -O0
+#DEBUG = -O3 -g
 libshim.so: $(OBJS)
 	$(CC) -shared $(DEBUG) -o $@ $^ -ldl -L$(LIBFS_BUILD_DIR) -lmlfs -L$(LIBSPDK_DIR) -lspdk $(LDFLAGS) $(TRACE)
 

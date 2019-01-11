@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <assert.h>
 
 #include <mlfs/mlfs_interface.h>
 #include <posix/posix_interface.h>
@@ -28,6 +30,8 @@
 extern "C" {
 #endif
 
+static int fd_map[1024];
+static char fn_map[1024][1024];
 static int collapse_name(const char *input, char *_output)
 {
 	char *output = _output;
@@ -69,7 +73,7 @@ static int collapse_name(const char *input, char *_output)
 
 int shim_do_open(char *filename, int flags, mode_t mode)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 	
 	memset(path_buf, 0, PATH_BUF_SIZE);
@@ -80,15 +84,15 @@ int shim_do_open(char *filename, int flags, mode_t mode)
 		;
 		// fall through
 	} else {
-		ret = mlfs_posix_open(filename, flags, mode);
+		mlfs_ret = mlfs_posix_open(filename, flags, mode);
 
-		if (!check_mlfs_fd(ret)) {
-			printf("incorrect fd %d: file %s\n", ret, filename);
+		if (!check_mlfs_fd(mlfs_ret)) {
+			printf("incorrect fd %d: file %s\n", mlfs_ret, filename);
+            assert(0);
 		}
 
-		syscall_trace(__func__, ret, 3, filename, flags, mode);
-			
-		return ret;
+		syscall_trace(__func__, mlfs_ret, 3, filename, flags, mode);
+		
 	}
 
 	asm("mov %1, %%rdi;"
@@ -101,13 +105,15 @@ int shim_do_open(char *filename, int flags, mode_t mode)
 		:"r"(filename), "r"(flags), "r"(mode), "r"(__NR_open)
 		:"rax", "rdi", "rsi", "rdx"
 		);
-
+    fd_map[ret] = mlfs_ret;
+    strcpy(fn_map[ret], filename);
+    printf("open fd_map %s %d\n", filename, ret);
 	return ret;
 }
 
 int shim_do_openat(int dfd, const char *filename, int flags, mode_t mode)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 	
 	memset(path_buf, 0, PATH_BUF_SIZE);
@@ -125,15 +131,15 @@ int shim_do_openat(int dfd, const char *filename, int flags, mode_t mode)
 			exit(-1);
 		}
 
-		ret = mlfs_posix_open((char *)filename, flags, mode);
+		mlfs_ret = mlfs_posix_open((char *)filename, flags, mode);
 
-		if (!check_mlfs_fd(ret)) {
-			printf("incorrect fd %d: file %s\n", ret, filename);
+		if (!check_mlfs_fd(mlfs_ret)) {
+			printf("incorrect fd %d: file %s\n", mlfs_ret, filename);
+            assert(0);
 		}
 
-		syscall_trace(__func__, ret, 4, filename, dfd, flags, mode);
+		syscall_trace(__func__, mlfs_ret, 4, filename, dfd, flags, mode);
 			
-		return ret;
 	}
 
 	asm("mov %1, %%edi;"
@@ -147,13 +153,15 @@ int shim_do_openat(int dfd, const char *filename, int flags, mode_t mode)
 		:"r"(dfd),"r"(filename), "r"(flags), "r"(mode), "r"(__NR_openat)
 		:"rax", "rdi", "rsi", "rdx", "r10"
 		);
-
+    fd_map[ret] = mlfs_ret;
+    strcpy(fn_map[ret], filename);
+    printf("openat fd_map %s %d\n", filename, ret);
 	return ret;
 }
 
 int shim_do_creat(char *filename, mode_t mode)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 	
 	memset(path_buf, 0, PATH_BUF_SIZE);
@@ -164,15 +172,15 @@ int shim_do_creat(char *filename, mode_t mode)
 		;
 		// fall through
 	} else {
-		ret = mlfs_posix_creat(filename, mode);
+		mlfs_ret = mlfs_posix_creat(filename, mode);
 
-		if (!check_mlfs_fd(ret)) {
-			printf("incorrect fd %d\n", ret);
+		if (!check_mlfs_fd(mlfs_ret)) {
+			printf("incorrect fd %d\n", mlfs_ret);
+            assert(0);
 		}
 			
-		syscall_trace(__func__, ret, 2, filename, mode);
+		syscall_trace(__func__, mlfs_ret, 2, filename, mode);
 
-		return ret;
 	}
 
 	asm("mov %1, %%rdi;"
@@ -184,20 +192,15 @@ int shim_do_creat(char *filename, mode_t mode)
 		:"m"(filename), "r"(mode), "r"(__NR_creat)
 		:"rax", "rdi", "rsi"
 		);
-
+    fd_map[ret] = mlfs_ret;
+    strcpy(fn_map[ret], filename);
+    printf("creat fd_map %s %d\n", filename, ret);
 	return ret;
 }
 
 size_t shim_do_read(int fd, void *buf, size_t count)
 {
-	int ret;
-
-	if (check_mlfs_fd(fd)) {
-		ret = mlfs_posix_read(get_mlfs_fd(fd), buf, count);
-		syscall_trace(__func__, ret, 3, fd, buf, count);
-
-		return ret;
-	}
+	int ret, mlfs_ret;
 
 	asm("mov %1, %%edi;"
 		"mov %2, %%rsi;"
@@ -209,20 +212,28 @@ size_t shim_do_read(int fd, void *buf, size_t count)
 		:"r"(fd), "m"(buf), "r"(count), "r"(__NR_read)
 		:"rax", "rdi", "rsi", "rdx"
 		);
+	if (check_mlfs_fd(fd_map[fd])) {
+        void *mlfs_buf = malloc(count);
+		mlfs_ret = mlfs_posix_read(get_mlfs_fd(fd_map[fd]), mlfs_buf, count);
+		syscall_trace(__func__, mlfs_ret, 3, fd, buf, count);
+        pid_t tid = syscall(SYS_gettid);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+        }
+        for (int i=0; i < ret; ++i) {
+            if (((char*)buf)[i] != ((char*)mlfs_buf)[i]) {
+                printf("%d %s inconsistent at fd %d(%s), ret %d(%d), count %lu, %p@%d buf %#1x, mlfs_buf %#1x\n", tid, __func__, fd, fn_map[fd], ret, mlfs_ret, count, mlfs_buf, i, ((char*)buf)[i], ((char*)mlfs_buf)[i]);
+                assert(0);
+            }
+        }
+	}
 
 	return ret;
 }
 
 size_t shim_do_pread64(int fd, void *buf, size_t count, loff_t off)
 {
-	int ret;
-
-	if (check_mlfs_fd(fd)) {
-		ret = mlfs_posix_pread64(get_mlfs_fd(fd), buf, count, off);
-		syscall_trace(__func__, ret, 4, fd, buf, count, off);
-
-		return ret;
-	}
+	int ret, mlfs_ret;
 
 	asm("mov %1, %%edi;"
 		"mov %2, %%rsi;"
@@ -236,19 +247,29 @@ size_t shim_do_pread64(int fd, void *buf, size_t count, loff_t off)
 		:"rax", "rdi", "rsi", "rdx", "r10"
 		);
 
+	if (check_mlfs_fd(fd_map[fd])) {
+        void *mlfs_buf = malloc(count);
+		mlfs_ret = mlfs_posix_pread64(get_mlfs_fd(fd_map[fd]), mlfs_buf, count, off);
+		syscall_trace(__func__, mlfs_ret, 4, fd, buf, count, off);
+        pid_t tid = syscall(SYS_gettid);
+        printf("%d pread64 %d(%s), count %lu, off %lu\n", tid, fd, fn_map[fd], count, off);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+        }
+        for (int i=0; i < ret; ++i) {
+            if (((char*)buf)[i] != ((char*)mlfs_buf)[i]) {
+                printf("%d %s inconsistent at fd %d(%s) count %lu, off %lu+%d buf %#1x, mlfs_buf %#1x\n", tid, __func__, fd, fn_map[fd], count, off, i, ((char*)buf)[i], ((char*)mlfs_buf)[i]);
+                assert(0);
+            }
+        }
+	}
+
 	return ret;
 }
 
 size_t shim_do_write(int fd, void *buf, size_t count)
 {
-	int ret;
-
-	if (check_mlfs_fd(fd)) {
-		ret = mlfs_posix_write(get_mlfs_fd(fd), buf, count);
-		syscall_trace(__func__, ret, 3, fd, buf, count);
-
-		return ret;
-	}
+	int ret, mlfs_ret;
 
 	asm("mov %1, %%edi;"
 		"mov %2, %%rsi;"
@@ -261,6 +282,16 @@ size_t shim_do_write(int fd, void *buf, size_t count)
 		:"rax", "rdi", "rsi", "rdx"
 		);
 
+	if (check_mlfs_fd(fd_map[fd])) {
+        pid_t tid = syscall(SYS_gettid);
+        printf("%d write to %d(%s), size %lu\n", tid, fd, fn_map[fd], count);
+		mlfs_ret = mlfs_posix_write(get_mlfs_fd(fd_map[fd]), buf, count);
+		syscall_trace(__func__, mlfs_ret, 3, fd, buf, count);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+            assert(0);
+        }
+	}
 	return ret;
 }
 
@@ -290,20 +321,13 @@ size_t shim_do_pwrite64(int fd, void *buf, size_t count, loff_t off)
 		:"r"(fd), "m"(buf), "r"(count),"r"(off), "r"(__NR_pwrite64)
 		:"rax", "rdi", "rsi", "rdx", "r10"
 		);
-
+    printf("write to %d(%s), off %lu, size %lu\n", fd, fn_map[fd], off, count);
 	return ret;
 }
 
 int shim_do_close(int fd)
 {
-	int ret;
-
-	if (check_mlfs_fd(fd)) {
-		ret = mlfs_posix_close(get_mlfs_fd(fd));
-		syscall_trace(__func__, ret, 1, fd);
-
-		return ret;
-	}
+	int ret, mlfs_ret;
 
 	asm("mov %1, %%edi;"
 		"mov %2, %%eax;"
@@ -314,19 +338,22 @@ int shim_do_close(int fd)
 		:"rax", "rdi"
 		);
 
+	if (check_mlfs_fd(fd_map[fd])) {
+		mlfs_ret = mlfs_posix_close(get_mlfs_fd(fd_map[fd]));
+		syscall_trace(__func__, mlfs_ret, 1, fd);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+        }
+	}
+    printf("close %d(%s)\n", fd, fn_map[fd]);
+    fd_map[fd] = 0;
+    fn_map[fd][0] = 0;
 	return ret;
 }
 
 int shim_do_lseek(int fd, off_t offset, int origin)
 {
-	int ret;
-
-	if (check_mlfs_fd(fd)) {
-		ret = mlfs_posix_lseek(get_mlfs_fd(fd), offset, origin);
-		syscall_trace(__func__, ret, 3, fd, offset, origin);
-
-		return ret;
-	}
+	int ret, mlfs_ret;
 
 	asm("mov %1, %%edi;"
 		"mov %2, %%rsi;"
@@ -339,12 +366,22 @@ int shim_do_lseek(int fd, off_t offset, int origin)
 		:"rax", "rdi", "rsi", "rdx"
 		);
 
+	if (check_mlfs_fd(fd_map[fd])) {
+		mlfs_ret = mlfs_posix_lseek(get_mlfs_fd(fd_map[fd]), offset, origin);
+		syscall_trace(__func__, mlfs_ret, 3, fd, offset, origin);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d, seek %d(%s), off %lu, origin %d\n", __func__, ret, mlfs_ret,fd, fn_map[fd], offset, origin);
+            assert(0);
+        }
+	}
+    //printf("seek %d(%s)\n", fd, fn_map[fd]);
+
 	return ret;
 }
 
 int shim_do_mkdir(void *path, mode_t mode)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 
 	memset(path_buf, 0, PATH_BUF_SIZE);
@@ -354,10 +391,8 @@ int shim_do_mkdir(void *path, mode_t mode)
 		;
 	} else {
 		//printf("%s: go to mlfs\n", path_buf);
-		ret = mlfs_posix_mkdir(path_buf, mode);
-		syscall_trace(__func__, ret, 2, path, mode);
-
-		return ret;
+		mlfs_ret = mlfs_posix_mkdir(path_buf, mode);
+		syscall_trace(__func__, mlfs_ret, 2, path, mode);
 	}
 
 	asm("mov %1, %%rdi;"
@@ -369,13 +404,15 @@ int shim_do_mkdir(void *path, mode_t mode)
 		:"m"(path), "r"(mode), "r"(__NR_mkdir)
 		:"rax", "rdi", "rsi"
 		);
-
+    if (mlfs_ret != ret) {
+        //printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+    }
 	return ret;
 }
 
 int shim_do_rmdir(const char *path)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 
 	memset(path_buf, 0, PATH_BUF_SIZE);
@@ -384,8 +421,7 @@ int shim_do_rmdir(const char *path)
 	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
 		;
 	} else {
-		ret = mlfs_posix_rmdir((char *)path);
-		return ret;
+		mlfs_ret = mlfs_posix_rmdir((char *)path);
 	}
 
 	asm("mov %1, %%rdi;"
@@ -396,28 +432,19 @@ int shim_do_rmdir(const char *path)
 		:"m"(path), "r"(__NR_rmdir)
 		:"rax", "rdi"
 		);
-
+    if (mlfs_ret != ret) {
+        //printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+    }
 	return ret;
 }
 
 int shim_do_rename(char *oldname, char *newname)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 	
 	memset(path_buf, 0, PATH_BUF_SIZE);
 	collapse_name(oldname, path_buf);
-
-	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
-		//printf("%s : will not go to libfs\n", path_buf);
-		;
-		// fall through
-	} else {
-		ret = mlfs_posix_rename(oldname, newname);
-		syscall_trace(__func__, ret, 2, oldname, newname);
-
-		return ret;
-	}
 
 	asm("mov %1, %%rdi;"
 		"mov %2, %%rsi;"
@@ -428,19 +455,30 @@ int shim_do_rename(char *oldname, char *newname)
 		:"m"(oldname), "m"(newname), "r"(__NR_rename)
 		:"rax", "rdi", "rsi"
 		);
+    printf("rename old %s, new %s\n", oldname, newname);
+	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
+		//printf("%s : will not go to libfs\n", path_buf);
+		;
+		// fall through
+	} else {
+        mlfs_ret = mlfs_posix_rename(oldname, newname);
+        syscall_trace(__func__, mlfs_ret, 2, oldname, newname);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+            assert(0);
+        }
+    }
 
 	return ret;
 }
 
 int shim_do_fallocate(int fd, int mode, off_t offset, off_t len)
 {
-	int ret;
+	int ret, mlfs_ret;
 
 	if (check_mlfs_fd(fd)) {
-		ret = mlfs_posix_fallocate(get_mlfs_fd(fd), offset, len);
-		syscall_trace(__func__, ret, 4, fd, mode, offset, len);
-
-		return ret;
+		mlfs_ret = mlfs_posix_fallocate(get_mlfs_fd(fd), offset, len);
+		syscall_trace(__func__, mlfs_ret, 4, fd, mode, offset, len);
 	}
 
 	asm("mov %1, %%edi;"
@@ -455,6 +493,9 @@ int shim_do_fallocate(int fd, int mode, off_t offset, off_t len)
 		:"rax", "rdi", "rsi", "rdx", "r10"
 		);
 
+    if (mlfs_ret != ret) {
+        printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+    }
 	return ret;
 }
 
@@ -563,6 +604,7 @@ int shim_do_truncate(const char *filename, off_t length)
 	} else {
 		ret = mlfs_posix_truncate(filename, length);
 		syscall_trace(__func__, ret, 2, filename, length);
+        assert(0 && "No truncate");
 
 		return ret;
 	}
@@ -587,6 +629,7 @@ int shim_do_ftruncate(int fd, off_t length)
 	if (check_mlfs_fd(fd)) {
 		ret = mlfs_posix_ftruncate(get_mlfs_fd(fd), length);
 		syscall_trace(__func__, ret, 2, fd, length);
+        assert(0 && "No ftruncate");
 
 		return ret;
 	}
@@ -606,20 +649,14 @@ int shim_do_ftruncate(int fd, off_t length)
 
 int shim_do_unlink(const char *path)
 {
+    pid_t tid = syscall(SYS_getpid);
+    printf("%d unlink %s\n", tid, path);
     return 0;
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 
 	memset(path_buf, 0, PATH_BUF_SIZE);
 	collapse_name(path, path_buf);
-
-	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
-		;
-	} else {
-		ret = mlfs_posix_unlink(path);
-		syscall_trace(__func__, ret, 1, path);
-		return ret;
-	}
 
 	asm("mov %1, %%rdi;"
 		"mov %2, %%eax;"
@@ -629,6 +666,13 @@ int shim_do_unlink(const char *path)
 		:"m"(path), "r"(__NR_unlink)
 		:"rax", "rdi"
 		);
+	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
+		;
+	} else {
+		mlfs_ret = mlfs_posix_unlink(path);
+		syscall_trace(__func__, ret, 1, path);
+        assert(mlfs_ret == ret && "inconsistent unlink");
+	}
 
 	return ret;
 }
@@ -666,23 +710,12 @@ int shim_do_symlink(const char *target, const char *linkpath)
 
 int shim_do_access(const char *pathname, int mode)
 {
-	int ret;
+	int ret, mlfs_ret;
 	char path_buf[PATH_BUF_SIZE];
 	
 	memset(path_buf, 0, PATH_BUF_SIZE);
 	collapse_name(pathname, path_buf);
 
-	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
-		//printf("%s : will not go to libfs\n", path_buf);
-		;
-		// fall through
-	} else {
-		ret = mlfs_posix_access((char *)pathname, mode);
-		syscall_trace(__func__, ret, 2, pathname, mode);
-		
-		return ret;
-	}
-			
 	asm("mov %1, %%rdi;"
 		"mov %2, %%esi;"
 		"mov %3, %%eax;"
@@ -693,6 +726,19 @@ int shim_do_access(const char *pathname, int mode)
 		:"rax", "rdi", "rsi"
 		);
 
+	if (strncmp(path_buf, MLFS_PREFIX, 5) != 0){
+		//printf("%s : will not go to libfs\n", path_buf);
+		;
+		// fall through
+	} else {
+		mlfs_ret = mlfs_posix_access((char *)pathname, mode);
+        syscall_trace(__func__, mlfs_ret, 2, pathname, mode);
+        if (mlfs_ret != ret) {
+            printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
+            assert(0);
+        }
+    }
+			
 	return ret;
 }
 
@@ -766,6 +812,7 @@ int shim_do_fcntl(int fd, int cmd, void *arg)
 	if (check_mlfs_fd(fd)) {
 		ret = mlfs_posix_fcntl(get_mlfs_fd(fd), cmd, arg);
 		syscall_trace(__func__, ret, 3, fd, cmd, arg);
+        assert(0 && "nofcntl");
 
 		return ret;
 	}
@@ -836,6 +883,7 @@ size_t shim_do_getdents(int fd, struct linux_dirent *buf, size_t count)
 		ret = mlfs_posix_getdents(get_mlfs_fd(fd), buf, count);
 
 		syscall_trace(__func__, ret, 3, fd, buf, count);
+        assert(0 && "no getdents");
 
 		return ret;
 	}
