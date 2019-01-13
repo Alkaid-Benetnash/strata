@@ -226,6 +226,7 @@ size_t shim_do_read(int fd, void *buf, size_t count)
                 assert(0);
             }
         }
+        free(mlfs_buf);
 	}
 
 	return ret;
@@ -249,10 +250,10 @@ size_t shim_do_pread64(int fd, void *buf, size_t count, loff_t off)
 
 	if (check_mlfs_fd(fd_map[fd])) {
         void *mlfs_buf = malloc(count);
-		mlfs_ret = mlfs_posix_pread64(get_mlfs_fd(fd_map[fd]), mlfs_buf, count, off);
-		syscall_trace(__func__, mlfs_ret, 4, fd, buf, count, off);
         pid_t tid = syscall(SYS_gettid);
         printf("%d pread64 %d(%s), count %lu, off %lu\n", tid, fd, fn_map[fd], count, off);
+        mlfs_ret = mlfs_posix_pread64(get_mlfs_fd(fd_map[fd]), mlfs_buf, count, off);
+        syscall_trace(__func__, mlfs_ret, 4, fd, buf, count, off);
         if (mlfs_ret != ret) {
             printf("%s inconsistent ret %d, mlfs %d\n", __func__, ret, mlfs_ret);
         }
@@ -283,8 +284,8 @@ size_t shim_do_write(int fd, void *buf, size_t count)
 		);
 
 	if (check_mlfs_fd(fd_map[fd])) {
-        pid_t tid = syscall(SYS_gettid);
-        printf("%d write to %d(%s), size %lu\n", tid, fd, fn_map[fd], count);
+        //pid_t tid = syscall(SYS_gettid);
+        //printf("%d write to %d(%s), size %lu\n", tid, fd, fn_map[fd], count);
 		mlfs_ret = mlfs_posix_write(get_mlfs_fd(fd_map[fd]), buf, count);
 		syscall_trace(__func__, mlfs_ret, 3, fd, buf, count);
         if (mlfs_ret != ret) {

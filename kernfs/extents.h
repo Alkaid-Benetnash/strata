@@ -94,7 +94,7 @@ struct mlfs_extent_header {
 	uint32_t eh_generation; /* generation of the tree */
 };
 
-#define MLFS_EXT_MAGIC (0xf30a)
+#define MLFS_EXT_MAGIC (0xf3fa)
 
 #define MLFS_EXTENT_TAIL_OFFSET(hdr)                 \
 	(sizeof(struct mlfs_extent_header) +             \

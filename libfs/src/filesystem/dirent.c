@@ -81,6 +81,7 @@ uint8_t *get_dirent_block(struct inode *dir_inode, offset_t offset)
     uint64_t tsc_begin;
 
 	mlfs_assert(dir_inode->itype == T_DIR);
+	//TODO: this out of boundary assertion is weird
 	mlfs_assert(offset <= dir_inode->size + sizeof(struct mlfs_dirent));
 
 	d_block = dcache_find(dev, dir_inode->inum, offset, g_fs_log);

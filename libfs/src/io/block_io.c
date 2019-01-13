@@ -931,7 +931,7 @@ int submit_bh(int is_write, struct buffer_head *bh)
 	return 0;
 }
 
-void after_buffer_sync(struct buffer_head *bh, int uptodate)
+/*void after_buffer_sync(struct buffer_head *bh, int uptodate)
 {
 	if (uptodate)
 		set_buffer_uptodate(bh);
@@ -985,6 +985,7 @@ int bh_submit_read(struct buffer_head *bh)
 		return 0;
 	}
 
+	//FIXME: why clean and remove dirty buffer when read it?
 	get_bh(bh);
 	clear_buffer_dirty(bh);
 	remove_buffer_from_writeback(bh);
@@ -994,6 +995,7 @@ int bh_submit_read(struct buffer_head *bh)
 	ret = submit_bh(READ, bh);
 	return ret;
 }
+*/
 
 /*
  * return: 0 means synced and no longer dirty
@@ -1024,7 +1026,7 @@ int sync_dirty_buffer(struct buffer_head *bh)
 }
 
 /* Direct write without using the writeback thread */
-int write_dirty_buffer(struct buffer_head *bh)
+/*int write_dirty_buffer(struct buffer_head *bh)
 {
 	int ret = 0;
 
@@ -1042,7 +1044,7 @@ int write_dirty_buffer(struct buffer_head *bh)
 	}
 	return ret;
 }
-
+*/
 struct buffer_head *__getblk(struct block_device *bdev, uint64_t block,
 			     int bsize)
 {

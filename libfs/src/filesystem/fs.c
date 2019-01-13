@@ -1146,6 +1146,7 @@ int do_unaligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_
   struct buffer_head *bh, *_bh;
   struct list_head io_list_log;
   bmap_req_t bmap_req;
+  mlfs_info("dst %p, off %lu, io_size %lu\n", dst, off, io_size);
 
   INIT_LIST_HEAD(&io_list_log);
 
@@ -1164,10 +1165,18 @@ int do_unaligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_
     g_perf_stats.l0_search_tsc += (asm_rdtscp() - start_tsc);
     g_perf_stats.l0_search_nr++;
   }
-
+  uint8_t *cache_content = NULL;
   if (_fcache_block) {
     ret = check_read_log_invalidation(_fcache_block);
     if (ret) {
+      cache_content = malloc(io_size);
+      bh = bh_get_sync_IO(g_fs_log->dev, _fcache_block->log_addr, BH_NO_DATA_ALLOC);
+      bh->b_offset = off - off_aligned;
+      bh->b_data = cache_content;
+      bh->b_size = io_size;
+      bh_submit_read_sync_IO(bh);
+      bh_release(bh);
+
       fcache_del(ip, _fcache_block);
       mlfs_free(_fcache_block);
       _fcache_block = NULL;
@@ -1195,7 +1204,7 @@ int do_unaligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_
            *                                |
            *                            (off+io_size)
            */
-          mlfs_debug("patching log %lu with start_offset %u\n", block_no, fc_off);
+          mlfs_info("patching log %lu with start_offset %u\n", block_no, fc_off);
           uint8_t buffer[g_block_size_bytes];
           bmap_req.start_offset = off_aligned;
           bmap_req.blk_count = 1;
@@ -1265,6 +1274,15 @@ int do_unaligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_
 
     bh_submit_read_sync_IO(bh);
     bh_release(bh);
+    if (cache_content) {
+        for (int i=0; i < io_size; ++i) {
+            if (cache_content[i] != dst[i]) {
+                mlfs_info("at off %lu, invalidate cache %x, from NVM %x\n", i, cache_content[i], dst[i]);
+                break;
+            }
+        }
+        free(cache_content);
+    }
 
     if (enable_perf_stats) {
       //printf("[%d] blkno = %llu, bh_size = %llu, io_size = %llu\n", __LINE__, bh->b_blocknr, bh->b_size, io_size);
@@ -1323,7 +1341,7 @@ int do_aligned_read(struct inode *ip, uint8_t *dst, offset_t off, uint32_t io_si
   uint32_t bitmap_size = (io_size >> g_block_size_shift), bitmap_pos;
   struct cache_copy_list copy_list[bitmap_size];
   bmap_req_t bmap_req;
-  mlfs_info("aligned read %lu(0x%lx) size %u\n", off, off, io_size);
+  mlfs_info("aligned read %lu(0x%lx) dst %p, size %u\n", off, off, dst, io_size);
 
   DECLARE_BITMAP(io_bitmap, bitmap_size);
 

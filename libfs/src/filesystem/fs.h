@@ -60,6 +60,7 @@ struct fcache_block {
 	uint32_t inum;
 	addr_t log_addr;		// block # of update log
 	uint8_t invalidate;
+	uint32_t log_version_should_be; // for debug, track the log_version if update it when every coalesce
 	uint32_t log_version;
 	/* track what in-block offset the cached data for this block in the log
 	 * starts from, non-zero offset happens when previous zero-start log

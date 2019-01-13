@@ -227,8 +227,14 @@ int dax_write(uint8_t dev, uint8_t *buf, addr_t blockno, uint32_t io_size)
 	//memmove(dax_addr[dev] + (blockno * g_block_size_bytes), buf, io_size);
 	perfmodel_add_delay(0, io_size);
 
-	mlfs_muffled("write block number %lu, address %lu size %u\n",
-			blockno, (blockno * g_block_size_bytes), io_size);
+#ifdef KERNFS
+    if (dev == g_root_dev) {
+        mlfs_info("write block number %lu, size %u, first byte %#1x\n",
+                blockno, io_size, ((unsigned char*)addr)[0]);
+        //if (io_size == 4096)
+        //    assert(0);
+    }
+#endif
 #ifdef STORAGE_PERF
     storage_tsc += asm_rdtscp() - tsc_begin;
     storage_nr++;
@@ -251,8 +257,15 @@ int dax_write_unaligned(uint8_t dev, uint8_t *buf, addr_t blockno, uint32_t offs
 	//memmove(dax_addr[dev] + (blockno * g_block_size_bytes) + offset, buf, io_size);
 	perfmodel_add_delay(0, io_size);
 
-	mlfs_muffled("write block number %lu, address %lu size %u\n",
-			blockno, (blockno * g_block_size_bytes) + offset, io_size);
+#ifdef KERNFS
+    if (dev == g_root_dev) {
+        mlfs_info("write block number %lu, size %u, first byte %#1x\n",
+                blockno, io_size, ((unsigned char*)addr)[0]);
+        //if (io_size == 4096)
+        //    assert(0);
+    }
+#endif
+
 #ifdef STORAGE_PERF
     storage_tsc += asm_rdtscp() - tsc_begin;
     storage_nr++;

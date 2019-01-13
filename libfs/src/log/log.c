@@ -546,7 +546,7 @@ int check_read_log_invalidation(struct fcache_block *_fcache_block)
 	if ((version_diff > 1) ||
 			(version_diff == 1 &&
 	   _fcache_block->log_addr < g_fs_log->next_avail)) {
-		mlfs_debug("invalidate: inum %u offset_key %lu -> addr %lu, start_offset %lu, version %d[%d](%d), start_blk %lu next_avail %lu\n",
+		mlfs_info("invalidate: inum %u offset_key %lu -> addr %lu, start_offset %lu, version %d[%d](%d), start_blk %lu next_avail %lu\n",
 				_fcache_block->inum, _fcache_block->key, _fcache_block->log_addr, _fcache_block->start_offset, _fcache_block->log_version, _fcache_block->log_version_should_be, g_fs_log->avail_version, g_fs_log->start_blk, g_fs_log->next_avail);
 		ret = 1;
 	}
@@ -575,7 +575,7 @@ int check_write_log_invalidation(struct fcache_block *_fcache_block)
 		(version_diff == 1 && (head < tail || (tail <= head && _fcache_block->log_addr < head))) ||
 		(version_diff == 0 && _fcache_block->log_addr < head && head < tail)
 	   ) {
-		mlfs_debug("invalidate: inum %u offset_key %lu -> addr %lu, start_offset %lu, version %d[%d](%d), start_blk %lu next_avail %lu, digesting %u, next_avail_digest %lu\n",
+		mlfs_info("invalidate: inum %u offset_key %lu -> addr %lu, start_offset %lu, version %d[%d](%d), start_blk %lu next_avail %lu, digesting %u, next_avail_digest %lu\n",
         _fcache_block->inum, _fcache_block->key, _fcache_block->log_addr, _fcache_block->start_offset,_fcache_block->log_version, _fcache_block->log_version_should_be, g_fs_log->avail_version, g_fs_log->start_blk, g_fs_log->next_avail, g_fs_log->digesting, g_log_sb->next_avail_digest);
 		return 1;
 	}
@@ -652,19 +652,21 @@ static int persist_log_file(struct logheader_meta *loghdr_meta,
 					log_bh->b_size = offset_in_block - fc_block->start_offset;
 					mlfs_write(log_bh);
 					bh_release(log_bh);
-					mlfs_debug("patch partial write log %lu, from %lu, offset from %lu to %lu\n", logblk_no, fc_block->log_addr, fc_block->start_offset, offset_in_block);
+					mlfs_info("patch partial write log %lu, from %lu, offset from %lu to %lu\n", logblk_no, fc_block->log_addr, fc_block->start_offset, offset_in_block);
 				}
 				else {
 					fc_block->start_offset = offset_in_block;
 				}
 				fc_block->log_version = g_fs_log->avail_version;
+				fc_block->log_version_should_be = g_fs_log->avail_version;
 				fc_block->log_addr = logblk_no;
 			}
 			// fc_block is valid
 			else {
 				if (fc_block->log_addr)  {
 					logblk_no = fc_block->log_addr;
-					mlfs_debug("write is coalesced %lu @ %lu\n", loghdr->data[idx], logblk_no);
+					fc_block->log_version_should_be = g_fs_log->avail_version;
+					//mlfs_info("write is coalesced key %lu @ %lu\n", key, logblk_no);
 				}
 			}
 		}
